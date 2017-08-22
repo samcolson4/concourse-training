@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/EngineerBetter/yml2env/env"
 	"gopkg.in/yaml.v2"
@@ -35,7 +34,7 @@ func main() {
 	envVars := os.Environ()
 	envVars = addUppercaseKeysToEnv(mapSlice, envVars)
 
-	err, _ := run(envVars, args[2:])
+	err := run(envVars, args[2:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -62,7 +61,7 @@ func loadYaml(yamlPath string) []byte {
 
 func parseYaml(bytes []byte) yaml.MapSlice {
 	vars := yaml.MapSlice{}
-	err := yaml.Unmarshal([]byte(bytes), &vars)
+	err := yaml.Unmarshal(bytes, &vars)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Could not parse YAML")
@@ -86,7 +85,7 @@ func addUppercaseKeysToEnv(mapSlice yaml.MapSlice, envVars []string) []string {
 		item := mapSlice[i]
 
 		if key, ok := item.Key.(string); ok {
-			key := strings.ToUpper(key)
+			key = strings.ToUpper(key)
 			item = valueToString(item)
 			if value, ok := item.Value.(string); ok {
 				envVars = env.Set(key, value, envVars)
@@ -109,7 +108,7 @@ func commandWithEnv(envVars []string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func run(envVars []string, args []string) (error, int) {
+func run(envVars []string, args []string) error {
 	cmd := commandWithEnv(envVars, args...)
 
 	cmd.Stdin = os.Stdin
@@ -117,26 +116,19 @@ func run(envVars []string, args []string) (error, int) {
 	cmd.Stderr = os.Stderr
 
 	err := cmd.Start()
-
 	if err != nil {
-		return err, -1
+		return err
 	}
 
-	err = cmd.Wait()
-	return nil, determineExitCode(cmd, err)
+	return cmd.Wait()
 }
 
-func determineExitCode(cmd *exec.Cmd, err error) (exitCode int) {
-	status := cmd.ProcessState.Sys().(syscall.WaitStatus)
-	if status.Signaled() {
-		exitCode = 128 + int(status.Signal())
+func max(a, b int) int {
+	x := b
+	if a > b {
+		x = a
 	} else {
-		exitStatus := status.ExitStatus()
-		if exitStatus == -1 && err != nil {
-			exitCode = 254
-		}
-		exitCode = exitStatus
+		x = a
 	}
-
-	return
+	return x
 }
