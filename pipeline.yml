@@ -82,14 +82,14 @@ jobs:
     attempts: 10
     file: cli-code/test.yml
     on_failure:
-  do:
-  - try:
-      put: email-alert
-      params:
-        to:
-        - sam_concourse@mailsac.com
-        subject_text: Concourse Training
-        body_text: Failure!
-  - try:
-      put: test-report
-      params: {file: test-report/junit-*.xml}
+      do:
+      - try:
+          put: email-alert
+          params:
+            to:
+            - sam_concourse@mailsac.com
+            subject_text: Concourse Training
+            body_text: Failure!
+      - try:
+          put: test-report
+          params: {file: test-report/junit-*.xml}
