@@ -1,0 +1,111 @@
+resource_types:
+- name: email
+  type: docker-image
+  source:
+    repository: mdomke/concourse-email-resource
+
+resources:
+- name: dockerfile-repo
+  type: git
+  source:
+    uri: http://flightsim-gogs/student/lab-assets
+    branch: master
+
+- name: golang-image
+  type: docker-image
+  source:
+    repository: flightsim-docker-registry:5000/student/golang-image
+    insecure_registries: [ "flightsim-docker-registry:5000" ]
+
+- name: cli-code
+  type: git
+  source:
+    uri: https://github.com/samcolson4/concourse-training
+    branch: master
+
+- name: release-candidate
+  type: s3
+  source:
+    bucket: release-candidates
+    regexp: yml2env-(.*)
+    access_key_id: "123456"
+    secret_access_key: qwertyui
+    disable_ssl: true
+    endpoint: flightsim-minio:9000
+
+- name: email-alert
+  type: email
+  source:
+    from: ci@example.com
+
+- name: test-report
+  type: s3
+  source:
+    bucket: test-reports
+    regexp: junit-(.*).xml
+    access_key_id: "123456"
+    secret_access_key: qwertyui
+    disable_ssl: true
+    endpoint: flightsim-minio:9000
+
+jobs:
+- name: build-image
+  plan:
+  - get: dockerfile-repo
+    trigger: true
+  - put: golang-image
+    params: {build: dockerfile-repo/}
+
+- name: compile
+  plan:
+  - get: cli-code
+    trigger: true
+  - get: golang-image
+    passed: [build-image]
+    trigger: true
+  - task: lint
+    image: golang-image
+    file: cli-code/lint.yml
+  - task: go-build
+    image: golang-image
+    file: cli-code/go-build.yml
+
+  - put: release-candidate
+    params: {file: built-binary/yml2env-*}
+
+- name: test
+  plan:
+  - get: cli-code
+    passed: [compile]
+    trigger: true
+  - task: test
+    attempts: 10
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: flightsim-docker-registry:5000/student/golang-image
+          insecure_registries: [ "flightsim-docker-registry:5000" ]
+      params:
+        FIXTURE_LOCATION: fixtures/
+        FLAKE: break_tests
+      inputs:
+      - name: cli-code
+        path: gopath/src/github.com/EngineerBetter/yml2env
+      run:
+        path: gopath/src/github.com/EngineerBetter/yml2env/test.sh
+      outputs:
+        - name: test-report
+    on_failure:
+      do:
+      - try:
+          put: email-alert
+          params:
+            to:
+            - sam_concourse@mailsac.com
+            subject_text: Concourse Training
+            body_text: Failure!
+      - try:
+          put: test-report
+          params: {file: test-report/junit-*.xml}
