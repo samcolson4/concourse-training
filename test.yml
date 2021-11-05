@@ -1,0 +1,16 @@
+platform: linux
+image_resource:
+  type: docker-image
+  source:
+    repository: flightsim-docker-registry:5000/student/golang-image
+    insecure_registries: [ "flightsim-docker-registry:5000" ]
+params:
+  FIXTURE_LOCATION: fixtures/
+  FLAKE: break_tests
+inputs:
+- name: cli-code
+  path: gopath/src/github.com/EngineerBetter/yml2env
+run:
+  path: gopath/src/github.com/EngineerBetter/yml2env/test.sh
+outputs:
+  - name: test-report

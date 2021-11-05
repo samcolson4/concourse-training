@@ -80,32 +80,16 @@ jobs:
     trigger: true
   - task: test
     attempts: 10
-    config:
-      platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: flightsim-docker-registry:5000/student/golang-image
-          insecure_registries: [ "flightsim-docker-registry:5000" ]
-      params:
-        FIXTURE_LOCATION: fixtures/
-        FLAKE: break_tests
-      inputs:
-      - name: cli-code
-        path: gopath/src/github.com/EngineerBetter/yml2env
-      run:
-        path: gopath/src/github.com/EngineerBetter/yml2env/test.sh
-      outputs:
-        - name: test-report
+    file: cli-code/test.yml
     on_failure:
-      do:
-      - try:
-          put: email-alert
-          params:
-            to:
-            - sam_concourse@mailsac.com
-            subject_text: Concourse Training
-            body_text: Failure!
-      - try:
-          put: test-report
-          params: {file: test-report/junit-*.xml}
+  do:
+  - try:
+      put: email-alert
+      params:
+        to:
+        - sam_concourse@mailsac.com
+        subject_text: Concourse Training
+        body_text: Failure!
+  - try:
+      put: test-report
+      params: {file: test-report/junit-*.xml}
